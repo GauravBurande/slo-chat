@@ -4,8 +4,6 @@ use solana_llm_oracle::cpi::{
     create_chat,
 };
 
-use crate::Agent;
-
 const AGENT_DESC: &str = "You are a helpful assistant.";
 
 #[derive(Accounts)]

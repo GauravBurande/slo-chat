@@ -16,14 +16,14 @@ pub mod chat_agent {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, seed: u8) -> Result<()> {
-        ctx.accounts.initalize(seed)?;
+        ctx.accounts.initialize(seed)
     }
 
     pub fn ai_inference(ctx: Context<AiInference>, text: String, seed: u8) -> Result<()> {
-        ctx.accounts.ai_inference(text, seed)?;
+        ctx.accounts.ai_inference(text, seed)
     }
 
-    pub fn callback(ctx: Context<Callback>, response: String) -> Result<()> {
-        ctx.accounts.callback(ai_response)?;
+    pub fn callback_from_ai(ctx: Context<CallbackFromAi>, response: String) -> Result<()> {
+        ctx.accounts.callback(response)
     }
 }

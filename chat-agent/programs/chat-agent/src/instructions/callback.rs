@@ -1,29 +1,26 @@
 use anchor_lang::{prelude::*, system_program::{Transfer, transfer}};
 use solana_llm_oracle::Config;
 
-use crate::{Response, error::ChatError, response};
+use crate::{Response, error::ChatError};
 
-pub struct Callback<'info> {
+#[derive(Accounts)]
+pub struct CallbackFromAi<'info> {
+     /// CHECK: this is checked by oracle program
     pub identity: Account<'info, Config>,
 
     /// CHECK: the user account we send with account metas at inference
     pub user: UncheckedAccount<'info>,
 
-    #[account(mut)]
-    #[account(
-        mut,
-        seeds=[b"response", user.key().as_ref()],
-        bump
-    )]
+    /// CHECK: it's callback account bro good
     pub response: Account<'info, Response>,
 
     pub system_program: Program<'info, System>
 }
 
-impl Callback<'info> {
+impl CallbackFromAi<'_> {
     pub fn callback(&mut self, ai_response: String) -> Result<()> {
         
-        if !self.identity.to_account_info().is_signer() {
+        if !self.identity.to_account_info().is_signer {
             return Err(ChatError::InvalidOracleIdentity.into());
         }
 
