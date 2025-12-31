@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BIDLOYAL",
+  title: "SLO CHAT",
   description: "Chat with onchain AI!",
 };
 

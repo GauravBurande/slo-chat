@@ -27,7 +27,7 @@ const Header = () => {
   return (
     <header className="flex py-5 font-stretch-semi-expanded justify-between items-center border-b-2">
       <Link href="/">
-        <h1 className="uppercase">bidloyal</h1>
+        <h1 className="uppercase">slo chat</h1>
       </Link>
       <div className="cursor-pointer">
         {isConnected && wallet ? (
