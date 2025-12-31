@@ -21,7 +21,8 @@ pub struct AiInference<'info> {
     pub inference: AccountInfo<'info>,
 
     #[account(
-        mut
+        init_if_needed,
+        payer=user,
         seeds=[b"response", user.key().as_ref()],
         bump
     )]
@@ -46,16 +47,26 @@ impl AiInference<'_> {
 
         let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
 
-        // todo: update with callback ixn discr
-        // create and allocate space with rent for the response pda
         let callback_discriminator: Vec<u32> = crate::instruction::Callback::DISCRIMINATOR;
 
         create_llm_inference(cpi_context, text, crate::ID, callback_discriminator, Some(
+            vec![
+                AccountMeta {
+                pubkey: self.user.to_account_info(),
+                is_signer: false,
+                is_writable: false
+            },
             AccountMeta {
                 pubkey: self.response.to_account_info(),
                 is_signer: false,
                 is_writable: true
+            },
+            AccountMeta {
+                pubkey: self.system_program.to_account_info(),
+                is_signer: false,
+                is_writable: false
             }
+            ]
         ))?;
 
         Ok(())
