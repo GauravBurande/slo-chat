@@ -20,10 +20,10 @@ pub mod chat_agent {
     }
 
     pub fn ai_inference(ctx: Context<AiInference>, text: String, seed: u8) -> Result<()> {
-        ctx.accounts.ai_inference(text, seed)
+        ctx.accounts.ai_inference(text, seed, &ctx.bumps)
     }
 
     pub fn callback_from_ai(ctx: Context<CallbackFromAi>, response: String) -> Result<()> {
-        ctx.accounts.callback(response)
+        ctx.accounts.callback(response, &ctx.bumps)
     }
 }

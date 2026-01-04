@@ -7,6 +7,6 @@ pub struct Response {
 
 impl Response {
     pub fn space(text: &str) -> usize {
-        8 + 4 + text.as_bytes().len() + 32 //padding
+        8 + 4 + text.as_bytes().len() + 8 //padding
     }
 }
