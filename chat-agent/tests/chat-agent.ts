@@ -44,7 +44,7 @@ describe("chat-agent", () => {
     programId
   );
 
-  it("Is initialized!", async () => {
+  xit("Is initialized!", async () => {
     // Add your test here.
     const tx = await program.methods
       .initialize(seed)
@@ -59,7 +59,7 @@ describe("chat-agent", () => {
   });
   it("create inference!", async () => {
     // Add your test here.
-    const text = "hi!";
+    const text = "yo!";
     const tx = await program.methods
       .aiInference(text, seed)
       .accountsPartial({

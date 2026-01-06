@@ -65,6 +65,13 @@ impl AiInference<'_> {
             invoke_signed(&create_ixn, &account_infos, signers_seeds)?;
         };
 
+        let cpi_context = CpiContext::new(self.system_program.to_account_info(), Transfer {
+            from: self.user.to_account_info(),
+            to: self.vault.to_account_info()
+        });
+
+        transfer(cpi_context, 5_000_000)?;
+
         let cpi_program = self.oracle_program.to_account_info();
 
         let cpi_accounts = CreateLlmInference {
@@ -97,17 +104,6 @@ impl AiInference<'_> {
             }
             ]
         ))?;
-
-        msg!("vault lamports: {}", self.vault.lamports());
-msg!("vault owner: {}", self.vault.owner);
-msg!("vault data len: {}", self.vault.data_len());
-
-        let cpi_context = CpiContext::new(self.system_program.to_account_info(), Transfer {
-            from: self.user.to_account_info(),
-            to: self.vault.to_account_info()
-        });
-
-        transfer(cpi_context, 5_000_000)?;
 
         Ok(())
     }
