@@ -12,19 +12,16 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressDecoder,
   getAddressEncoder,
-  getArrayDecoder,
-  getArrayEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getOptionDecoder,
-  getOptionEncoder,
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU32Decoder,
   getU32Encoder,
+  getU8Decoder,
+  getU8Encoder,
   getUtf8Decoder,
   getUtf8Encoder,
   transformEncoder,
@@ -37,42 +34,38 @@ import {
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
-  type Option,
-  type OptionOrNullable,
   type ReadonlyAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
   type WritableSignerAccount,
 } from "@solana/kit";
-import { SOLANA_LLM_ORACLE_PROGRAM_ADDRESS } from "../programs";
+import { CHAT_AGENT_PROGRAM_ADDRESS } from "../programs";
 import {
   expectAddress,
   getAccountMetaFactory,
   type ResolvedAccount,
 } from "../shared";
-import {
-  getAccountMetaDecoder,
-  getAccountMetaEncoder,
-  type AccountMeta,
-  type AccountMetaArgs,
-} from "../types";
 
-export const CREATE_LLM_INFERENCE_DISCRIMINATOR = new Uint8Array([
-  137, 172, 23, 129, 50, 162, 3, 252,
+export const AI_INFERENCE_DISCRIMINATOR = new Uint8Array([
+  139, 217, 84, 45, 253, 148, 169, 10,
 ]);
 
-export function getCreateLlmInferenceDiscriminatorBytes() {
+export function getAiInferenceDiscriminatorBytes() {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    CREATE_LLM_INFERENCE_DISCRIMINATOR,
+    AI_INFERENCE_DISCRIMINATOR,
   );
 }
 
-export type CreateLlmInferenceInstruction<
-  TProgram extends string = typeof SOLANA_LLM_ORACLE_PROGRAM_ADDRESS,
+export type AiInferenceInstruction<
+  TProgram extends string = typeof CHAT_AGENT_PROGRAM_ADDRESS,
   TAccountUser extends string | AccountMeta<string> = string,
   TAccountChatContext extends string | AccountMeta<string> = string,
   TAccountInference extends string | AccountMeta<string> = string,
+  TAccountResponse extends string | AccountMeta<string> = string,
+  TAccountVault extends string | AccountMeta<string> = string,
+  TAccountOracleProgram extends string | AccountMeta<string> =
+    "LLM4VF4uxgbcrUdwF9rBh7MUEypURp8FurEdZLhZqed",
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -89,6 +82,15 @@ export type CreateLlmInferenceInstruction<
       TAccountInference extends string
         ? WritableAccount<TAccountInference>
         : TAccountInference,
+      TAccountResponse extends string
+        ? WritableAccount<TAccountResponse>
+        : TAccountResponse,
+      TAccountVault extends string
+        ? WritableAccount<TAccountVault>
+        : TAccountVault,
+      TAccountOracleProgram extends string
+        ? ReadonlyAccount<TAccountOracleProgram>
+        : TAccountOracleProgram,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -96,206 +98,106 @@ export type CreateLlmInferenceInstruction<
     ]
   >;
 
-export type CreateLlmInferenceInstructionData = {
+export type AiInferenceInstructionData = {
   discriminator: ReadonlyUint8Array;
   text: string;
-  callbackProgramId: Address;
-  callbackDiscriminator: ReadonlyUint8Array;
-  accountMetas: Option<Array<AccountMeta>>;
+  seed: number;
 };
 
-export type CreateLlmInferenceInstructionDataArgs = {
-  text: string;
-  callbackProgramId: Address;
-  callbackDiscriminator: ReadonlyUint8Array;
-  accountMetas: OptionOrNullable<Array<AccountMetaArgs>>;
-};
+export type AiInferenceInstructionDataArgs = { text: string; seed: number };
 
-export function getCreateLlmInferenceInstructionDataEncoder(): Encoder<CreateLlmInferenceInstructionDataArgs> {
+export function getAiInferenceInstructionDataEncoder(): Encoder<AiInferenceInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["text", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
-      ["callbackProgramId", getAddressEncoder()],
-      ["callbackDiscriminator", fixEncoderSize(getBytesEncoder(), 8)],
-      [
-        "accountMetas",
-        getOptionEncoder(getArrayEncoder(getAccountMetaEncoder())),
-      ],
+      ["seed", getU8Encoder()],
     ]),
-    (value) => ({
-      ...value,
-      discriminator: CREATE_LLM_INFERENCE_DISCRIMINATOR,
-    }),
+    (value) => ({ ...value, discriminator: AI_INFERENCE_DISCRIMINATOR }),
   );
 }
 
-export function getCreateLlmInferenceInstructionDataDecoder(): Decoder<CreateLlmInferenceInstructionData> {
+export function getAiInferenceInstructionDataDecoder(): Decoder<AiInferenceInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["text", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
-    ["callbackProgramId", getAddressDecoder()],
-    ["callbackDiscriminator", fixDecoderSize(getBytesDecoder(), 8)],
-    [
-      "accountMetas",
-      getOptionDecoder(getArrayDecoder(getAccountMetaDecoder())),
-    ],
+    ["seed", getU8Decoder()],
   ]);
 }
 
-export function getCreateLlmInferenceInstructionDataCodec(): Codec<
-  CreateLlmInferenceInstructionDataArgs,
-  CreateLlmInferenceInstructionData
+export function getAiInferenceInstructionDataCodec(): Codec<
+  AiInferenceInstructionDataArgs,
+  AiInferenceInstructionData
 > {
   return combineCodec(
-    getCreateLlmInferenceInstructionDataEncoder(),
-    getCreateLlmInferenceInstructionDataDecoder(),
+    getAiInferenceInstructionDataEncoder(),
+    getAiInferenceInstructionDataDecoder(),
   );
 }
 
-export type CreateLlmInferenceAsyncInput<
+export type AiInferenceAsyncInput<
   TAccountUser extends string = string,
   TAccountChatContext extends string = string,
   TAccountInference extends string = string,
-  TAccountSystemProgram extends string = string,
-> = {
-  user: TransactionSigner<TAccountUser>;
-  chatContext: Address<TAccountChatContext>;
-  inference?: Address<TAccountInference>;
-  systemProgram?: Address<TAccountSystemProgram>;
-  text: CreateLlmInferenceInstructionDataArgs["text"];
-  callbackProgramId: CreateLlmInferenceInstructionDataArgs["callbackProgramId"];
-  callbackDiscriminator: CreateLlmInferenceInstructionDataArgs["callbackDiscriminator"];
-  accountMetas: CreateLlmInferenceInstructionDataArgs["accountMetas"];
-};
-
-export async function getCreateLlmInferenceInstructionAsync<
-  TAccountUser extends string,
-  TAccountChatContext extends string,
-  TAccountInference extends string,
-  TAccountSystemProgram extends string,
-  TProgramAddress extends Address = typeof SOLANA_LLM_ORACLE_PROGRAM_ADDRESS,
->(
-  input: CreateLlmInferenceAsyncInput<
-    TAccountUser,
-    TAccountChatContext,
-    TAccountInference,
-    TAccountSystemProgram
-  >,
-  config?: { programAddress?: TProgramAddress },
-): Promise<
-  CreateLlmInferenceInstruction<
-    TProgramAddress,
-    TAccountUser,
-    TAccountChatContext,
-    TAccountInference,
-    TAccountSystemProgram
-  >
-> {
-  // Program address.
-  const programAddress =
-    config?.programAddress ?? SOLANA_LLM_ORACLE_PROGRAM_ADDRESS;
-
-  // Original accounts.
-  const originalAccounts = {
-    user: { value: input.user ?? null, isWritable: true },
-    chatContext: { value: input.chatContext ?? null, isWritable: false },
-    inference: { value: input.inference ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-  };
-  const accounts = originalAccounts as Record<
-    keyof typeof originalAccounts,
-    ResolvedAccount
-  >;
-
-  // Original args.
-  const args = { ...input };
-
-  // Resolve default values.
-  if (!accounts.inference.value) {
-    accounts.inference.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(
-          new Uint8Array([105, 110, 102, 101, 114, 101, 110, 99, 101]),
-        ),
-        getAddressEncoder().encode(expectAddress(accounts.user.value)),
-        getAddressEncoder().encode(expectAddress(accounts.chatContext.value)),
-      ],
-    });
-  }
-  if (!accounts.systemProgram.value) {
-    accounts.systemProgram.value =
-      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
-  }
-
-  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-  return Object.freeze({
-    accounts: [
-      getAccountMeta(accounts.user),
-      getAccountMeta(accounts.chatContext),
-      getAccountMeta(accounts.inference),
-      getAccountMeta(accounts.systemProgram),
-    ],
-    data: getCreateLlmInferenceInstructionDataEncoder().encode(
-      args as CreateLlmInferenceInstructionDataArgs,
-    ),
-    programAddress,
-  } as CreateLlmInferenceInstruction<
-    TProgramAddress,
-    TAccountUser,
-    TAccountChatContext,
-    TAccountInference,
-    TAccountSystemProgram
-  >);
-}
-
-export type CreateLlmInferenceInput<
-  TAccountUser extends string = string,
-  TAccountChatContext extends string = string,
-  TAccountInference extends string = string,
+  TAccountResponse extends string = string,
+  TAccountVault extends string = string,
+  TAccountOracleProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   user: TransactionSigner<TAccountUser>;
   chatContext: Address<TAccountChatContext>;
   inference: Address<TAccountInference>;
+  response?: Address<TAccountResponse>;
+  vault?: Address<TAccountVault>;
+  oracleProgram?: Address<TAccountOracleProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
-  text: CreateLlmInferenceInstructionDataArgs["text"];
-  callbackProgramId: CreateLlmInferenceInstructionDataArgs["callbackProgramId"];
-  callbackDiscriminator: CreateLlmInferenceInstructionDataArgs["callbackDiscriminator"];
-  accountMetas: CreateLlmInferenceInstructionDataArgs["accountMetas"];
+  text: AiInferenceInstructionDataArgs["text"];
+  seed: AiInferenceInstructionDataArgs["seed"];
 };
 
-export function getCreateLlmInferenceInstruction<
+export async function getAiInferenceInstructionAsync<
   TAccountUser extends string,
   TAccountChatContext extends string,
   TAccountInference extends string,
+  TAccountResponse extends string,
+  TAccountVault extends string,
+  TAccountOracleProgram extends string,
   TAccountSystemProgram extends string,
-  TProgramAddress extends Address = typeof SOLANA_LLM_ORACLE_PROGRAM_ADDRESS,
+  TProgramAddress extends Address = typeof CHAT_AGENT_PROGRAM_ADDRESS,
 >(
-  input: CreateLlmInferenceInput<
+  input: AiInferenceAsyncInput<
     TAccountUser,
     TAccountChatContext,
     TAccountInference,
+    TAccountResponse,
+    TAccountVault,
+    TAccountOracleProgram,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
-): CreateLlmInferenceInstruction<
-  TProgramAddress,
-  TAccountUser,
-  TAccountChatContext,
-  TAccountInference,
-  TAccountSystemProgram
+): Promise<
+  AiInferenceInstruction<
+    TProgramAddress,
+    TAccountUser,
+    TAccountChatContext,
+    TAccountInference,
+    TAccountResponse,
+    TAccountVault,
+    TAccountOracleProgram,
+    TAccountSystemProgram
+  >
 > {
   // Program address.
-  const programAddress =
-    config?.programAddress ?? SOLANA_LLM_ORACLE_PROGRAM_ADDRESS;
+  const programAddress = config?.programAddress ?? CHAT_AGENT_PROGRAM_ADDRESS;
 
   // Original accounts.
   const originalAccounts = {
     user: { value: input.user ?? null, isWritable: true },
     chatContext: { value: input.chatContext ?? null, isWritable: false },
     inference: { value: input.inference ?? null, isWritable: true },
+    response: { value: input.response ?? null, isWritable: true },
+    vault: { value: input.vault ?? null, isWritable: true },
+    oracleProgram: { value: input.oracleProgram ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -307,6 +209,30 @@ export function getCreateLlmInferenceInstruction<
   const args = { ...input };
 
   // Resolve default values.
+  if (!accounts.response.value) {
+    accounts.response.value = await getProgramDerivedAddress({
+      programAddress,
+      seeds: [
+        getBytesEncoder().encode(
+          new Uint8Array([114, 101, 115, 112, 111, 110, 115, 101]),
+        ),
+        getAddressEncoder().encode(expectAddress(accounts.user.value)),
+      ],
+    });
+  }
+  if (!accounts.vault.value) {
+    accounts.vault.value = await getProgramDerivedAddress({
+      programAddress,
+      seeds: [
+        getBytesEncoder().encode(new Uint8Array([118, 97, 117, 108, 116])),
+        getAddressEncoder().encode(expectAddress(accounts.response.value)),
+      ],
+    });
+  }
+  if (!accounts.oracleProgram.value) {
+    accounts.oracleProgram.value =
+      "LLM4VF4uxgbcrUdwF9rBh7MUEypURp8FurEdZLhZqed" as Address<"LLM4VF4uxgbcrUdwF9rBh7MUEypURp8FurEdZLhZqed">;
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -318,23 +244,137 @@ export function getCreateLlmInferenceInstruction<
       getAccountMeta(accounts.user),
       getAccountMeta(accounts.chatContext),
       getAccountMeta(accounts.inference),
+      getAccountMeta(accounts.response),
+      getAccountMeta(accounts.vault),
+      getAccountMeta(accounts.oracleProgram),
       getAccountMeta(accounts.systemProgram),
     ],
-    data: getCreateLlmInferenceInstructionDataEncoder().encode(
-      args as CreateLlmInferenceInstructionDataArgs,
+    data: getAiInferenceInstructionDataEncoder().encode(
+      args as AiInferenceInstructionDataArgs,
     ),
     programAddress,
-  } as CreateLlmInferenceInstruction<
+  } as AiInferenceInstruction<
     TProgramAddress,
     TAccountUser,
     TAccountChatContext,
     TAccountInference,
+    TAccountResponse,
+    TAccountVault,
+    TAccountOracleProgram,
     TAccountSystemProgram
   >);
 }
 
-export type ParsedCreateLlmInferenceInstruction<
-  TProgram extends string = typeof SOLANA_LLM_ORACLE_PROGRAM_ADDRESS,
+export type AiInferenceInput<
+  TAccountUser extends string = string,
+  TAccountChatContext extends string = string,
+  TAccountInference extends string = string,
+  TAccountResponse extends string = string,
+  TAccountVault extends string = string,
+  TAccountOracleProgram extends string = string,
+  TAccountSystemProgram extends string = string,
+> = {
+  user: TransactionSigner<TAccountUser>;
+  chatContext: Address<TAccountChatContext>;
+  inference: Address<TAccountInference>;
+  response: Address<TAccountResponse>;
+  vault: Address<TAccountVault>;
+  oracleProgram?: Address<TAccountOracleProgram>;
+  systemProgram?: Address<TAccountSystemProgram>;
+  text: AiInferenceInstructionDataArgs["text"];
+  seed: AiInferenceInstructionDataArgs["seed"];
+};
+
+export function getAiInferenceInstruction<
+  TAccountUser extends string,
+  TAccountChatContext extends string,
+  TAccountInference extends string,
+  TAccountResponse extends string,
+  TAccountVault extends string,
+  TAccountOracleProgram extends string,
+  TAccountSystemProgram extends string,
+  TProgramAddress extends Address = typeof CHAT_AGENT_PROGRAM_ADDRESS,
+>(
+  input: AiInferenceInput<
+    TAccountUser,
+    TAccountChatContext,
+    TAccountInference,
+    TAccountResponse,
+    TAccountVault,
+    TAccountOracleProgram,
+    TAccountSystemProgram
+  >,
+  config?: { programAddress?: TProgramAddress },
+): AiInferenceInstruction<
+  TProgramAddress,
+  TAccountUser,
+  TAccountChatContext,
+  TAccountInference,
+  TAccountResponse,
+  TAccountVault,
+  TAccountOracleProgram,
+  TAccountSystemProgram
+> {
+  // Program address.
+  const programAddress = config?.programAddress ?? CHAT_AGENT_PROGRAM_ADDRESS;
+
+  // Original accounts.
+  const originalAccounts = {
+    user: { value: input.user ?? null, isWritable: true },
+    chatContext: { value: input.chatContext ?? null, isWritable: false },
+    inference: { value: input.inference ?? null, isWritable: true },
+    response: { value: input.response ?? null, isWritable: true },
+    vault: { value: input.vault ?? null, isWritable: true },
+    oracleProgram: { value: input.oracleProgram ?? null, isWritable: false },
+    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+  };
+  const accounts = originalAccounts as Record<
+    keyof typeof originalAccounts,
+    ResolvedAccount
+  >;
+
+  // Original args.
+  const args = { ...input };
+
+  // Resolve default values.
+  if (!accounts.oracleProgram.value) {
+    accounts.oracleProgram.value =
+      "LLM4VF4uxgbcrUdwF9rBh7MUEypURp8FurEdZLhZqed" as Address<"LLM4VF4uxgbcrUdwF9rBh7MUEypURp8FurEdZLhZqed">;
+  }
+  if (!accounts.systemProgram.value) {
+    accounts.systemProgram.value =
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
+  }
+
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+  return Object.freeze({
+    accounts: [
+      getAccountMeta(accounts.user),
+      getAccountMeta(accounts.chatContext),
+      getAccountMeta(accounts.inference),
+      getAccountMeta(accounts.response),
+      getAccountMeta(accounts.vault),
+      getAccountMeta(accounts.oracleProgram),
+      getAccountMeta(accounts.systemProgram),
+    ],
+    data: getAiInferenceInstructionDataEncoder().encode(
+      args as AiInferenceInstructionDataArgs,
+    ),
+    programAddress,
+  } as AiInferenceInstruction<
+    TProgramAddress,
+    TAccountUser,
+    TAccountChatContext,
+    TAccountInference,
+    TAccountResponse,
+    TAccountVault,
+    TAccountOracleProgram,
+    TAccountSystemProgram
+  >);
+}
+
+export type ParsedAiInferenceInstruction<
+  TProgram extends string = typeof CHAT_AGENT_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
@@ -342,20 +382,23 @@ export type ParsedCreateLlmInferenceInstruction<
     user: TAccountMetas[0];
     chatContext: TAccountMetas[1];
     inference: TAccountMetas[2];
-    systemProgram: TAccountMetas[3];
+    response: TAccountMetas[3];
+    vault: TAccountMetas[4];
+    oracleProgram: TAccountMetas[5];
+    systemProgram: TAccountMetas[6];
   };
-  data: CreateLlmInferenceInstructionData;
+  data: AiInferenceInstructionData;
 };
 
-export function parseCreateLlmInferenceInstruction<
+export function parseAiInferenceInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedCreateLlmInferenceInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 4) {
+): ParsedAiInferenceInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 7) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -371,10 +414,11 @@ export function parseCreateLlmInferenceInstruction<
       user: getNextAccount(),
       chatContext: getNextAccount(),
       inference: getNextAccount(),
+      response: getNextAccount(),
+      vault: getNextAccount(),
+      oracleProgram: getNextAccount(),
       systemProgram: getNextAccount(),
     },
-    data: getCreateLlmInferenceInstructionDataDecoder().decode(
-      instruction.data,
-    ),
+    data: getAiInferenceInstructionDataDecoder().decode(instruction.data),
   };
 }

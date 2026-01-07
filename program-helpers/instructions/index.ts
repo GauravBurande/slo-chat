@@ -6,4 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./accountMeta";
+export * from "./aiInference";
+export * from "./callbackFromAi";
+export * from "./initialize";

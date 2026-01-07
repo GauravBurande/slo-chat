@@ -6,6 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./chatContext";
-export * from "./config";
-export * from "./inference";
+export * from "./accounts";
+export * from "./errors";
+export * from "./instructions";
+export * from "./programs";

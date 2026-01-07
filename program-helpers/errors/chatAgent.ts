@@ -12,38 +12,29 @@ import {
   type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
   type SolanaError,
 } from "@solana/kit";
-import { SOLANA_LLM_ORACLE_PROGRAM_ADDRESS } from "../programs";
+import { CHAT_AGENT_PROGRAM_ADDRESS } from "../programs";
 
-/** InvalidAdmin: You're not an admin ser! */
-export const SOLANA_LLM_ORACLE_ERROR__INVALID_ADMIN = 0x1770; // 6000
+/** InvalidOracleIdentity: Invalid account or oracle sent the callback! */
+export const CHAT_AGENT_ERROR__INVALID_ORACLE_IDENTITY = 0x1770; // 6000
 
-export type SolanaLlmOracleError =
-  typeof SOLANA_LLM_ORACLE_ERROR__INVALID_ADMIN;
+export type ChatAgentError = typeof CHAT_AGENT_ERROR__INVALID_ORACLE_IDENTITY;
 
-let solanaLlmOracleErrorMessages:
-  | Record<SolanaLlmOracleError, string>
-  | undefined;
+let chatAgentErrorMessages: Record<ChatAgentError, string> | undefined;
 if (process.env.NODE_ENV !== "production") {
-  solanaLlmOracleErrorMessages = {
-    [SOLANA_LLM_ORACLE_ERROR__INVALID_ADMIN]: `You're not an admin ser!`,
+  chatAgentErrorMessages = {
+    [CHAT_AGENT_ERROR__INVALID_ORACLE_IDENTITY]: `Invalid account or oracle sent the callback!`,
   };
 }
 
-export function getSolanaLlmOracleErrorMessage(
-  code: SolanaLlmOracleError,
-): string {
+export function getChatAgentErrorMessage(code: ChatAgentError): string {
   if (process.env.NODE_ENV !== "production") {
-    return (
-      solanaLlmOracleErrorMessages as Record<SolanaLlmOracleError, string>
-    )[code];
+    return (chatAgentErrorMessages as Record<ChatAgentError, string>)[code];
   }
 
   return "Error message not available in production bundles.";
 }
 
-export function isSolanaLlmOracleError<
-  TProgramErrorCode extends SolanaLlmOracleError,
->(
+export function isChatAgentError<TProgramErrorCode extends ChatAgentError>(
   error: unknown,
   transactionMessage: {
     instructions: Record<number, { programAddress: Address }>;
@@ -54,7 +45,7 @@ export function isSolanaLlmOracleError<
   return isProgramError<TProgramErrorCode>(
     error,
     transactionMessage,
-    SOLANA_LLM_ORACLE_PROGRAM_ADDRESS,
+    CHAT_AGENT_PROGRAM_ADDRESS,
     code,
   );
 }

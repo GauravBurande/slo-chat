@@ -12,9 +12,10 @@ import {
   fixEncoderSize,
   getBytesDecoder,
   getBytesEncoder,
-  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -31,7 +32,7 @@ import {
   type WritableAccount,
   type WritableSignerAccount,
 } from "@solana/kit";
-import { SOLANA_LLM_ORACLE_PROGRAM_ADDRESS } from "../programs";
+import { CHAT_AGENT_PROGRAM_ADDRESS } from "../programs";
 import { getAccountMetaFactory, type ResolvedAccount } from "../shared";
 
 export const INITIALIZE_DISCRIMINATOR = new Uint8Array([
@@ -43,9 +44,11 @@ export function getInitializeDiscriminatorBytes() {
 }
 
 export type InitializeInstruction<
-  TProgram extends string = typeof SOLANA_LLM_ORACLE_PROGRAM_ADDRESS,
-  TAccountAdmin extends string | AccountMeta<string> = string,
-  TAccountConfig extends string | AccountMeta<string> = string,
+  TProgram extends string = typeof CHAT_AGENT_PROGRAM_ADDRESS,
+  TAccountUser extends string | AccountMeta<string> = string,
+  TAccountChatContext extends string | AccountMeta<string> = string,
+  TAccountOracleProgram extends string | AccountMeta<string> =
+    "LLM4VF4uxgbcrUdwF9rBh7MUEypURp8FurEdZLhZqed",
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -53,13 +56,15 @@ export type InitializeInstruction<
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountAdmin extends string
-        ? WritableSignerAccount<TAccountAdmin> &
-            AccountSignerMeta<TAccountAdmin>
-        : TAccountAdmin,
-      TAccountConfig extends string
-        ? WritableAccount<TAccountConfig>
-        : TAccountConfig,
+      TAccountUser extends string
+        ? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
+        : TAccountUser,
+      TAccountChatContext extends string
+        ? WritableAccount<TAccountChatContext>
+        : TAccountChatContext,
+      TAccountOracleProgram extends string
+        ? ReadonlyAccount<TAccountOracleProgram>
+        : TAccountOracleProgram,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -67,13 +72,19 @@ export type InitializeInstruction<
     ]
   >;
 
-export type InitializeInstructionData = { discriminator: ReadonlyUint8Array };
+export type InitializeInstructionData = {
+  discriminator: ReadonlyUint8Array;
+  seed: number;
+};
 
-export type InitializeInstructionDataArgs = {};
+export type InitializeInstructionDataArgs = { seed: number };
 
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["seed", getU8Encoder()],
+    ]),
     (value) => ({ ...value, discriminator: INITIALIZE_DISCRIMINATOR }),
   );
 }
@@ -81,6 +92,7 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<Initiali
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<InitializeInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["seed", getU8Decoder()],
   ]);
 }
 
@@ -94,114 +106,48 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
   );
 }
 
-export type InitializeAsyncInput<
-  TAccountAdmin extends string = string,
-  TAccountConfig extends string = string,
-  TAccountSystemProgram extends string = string,
-> = {
-  admin: TransactionSigner<TAccountAdmin>;
-  config?: Address<TAccountConfig>;
-  systemProgram?: Address<TAccountSystemProgram>;
-};
-
-export async function getInitializeInstructionAsync<
-  TAccountAdmin extends string,
-  TAccountConfig extends string,
-  TAccountSystemProgram extends string,
-  TProgramAddress extends Address = typeof SOLANA_LLM_ORACLE_PROGRAM_ADDRESS,
->(
-  input: InitializeAsyncInput<
-    TAccountAdmin,
-    TAccountConfig,
-    TAccountSystemProgram
-  >,
-  config?: { programAddress?: TProgramAddress },
-): Promise<
-  InitializeInstruction<
-    TProgramAddress,
-    TAccountAdmin,
-    TAccountConfig,
-    TAccountSystemProgram
-  >
-> {
-  // Program address.
-  const programAddress =
-    config?.programAddress ?? SOLANA_LLM_ORACLE_PROGRAM_ADDRESS;
-
-  // Original accounts.
-  const originalAccounts = {
-    admin: { value: input.admin ?? null, isWritable: true },
-    config: { value: input.config ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-  };
-  const accounts = originalAccounts as Record<
-    keyof typeof originalAccounts,
-    ResolvedAccount
-  >;
-
-  // Resolve default values.
-  if (!accounts.config.value) {
-    accounts.config.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([99, 111, 110, 102, 105, 103])),
-      ],
-    });
-  }
-  if (!accounts.systemProgram.value) {
-    accounts.systemProgram.value =
-      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
-  }
-
-  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-  return Object.freeze({
-    accounts: [
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.config),
-      getAccountMeta(accounts.systemProgram),
-    ],
-    data: getInitializeInstructionDataEncoder().encode({}),
-    programAddress,
-  } as InitializeInstruction<
-    TProgramAddress,
-    TAccountAdmin,
-    TAccountConfig,
-    TAccountSystemProgram
-  >);
-}
-
 export type InitializeInput<
-  TAccountAdmin extends string = string,
-  TAccountConfig extends string = string,
+  TAccountUser extends string = string,
+  TAccountChatContext extends string = string,
+  TAccountOracleProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
-  admin: TransactionSigner<TAccountAdmin>;
-  config: Address<TAccountConfig>;
+  user: TransactionSigner<TAccountUser>;
+  chatContext: Address<TAccountChatContext>;
+  oracleProgram?: Address<TAccountOracleProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
+  seed: InitializeInstructionDataArgs["seed"];
 };
 
 export function getInitializeInstruction<
-  TAccountAdmin extends string,
-  TAccountConfig extends string,
+  TAccountUser extends string,
+  TAccountChatContext extends string,
+  TAccountOracleProgram extends string,
   TAccountSystemProgram extends string,
-  TProgramAddress extends Address = typeof SOLANA_LLM_ORACLE_PROGRAM_ADDRESS,
+  TProgramAddress extends Address = typeof CHAT_AGENT_PROGRAM_ADDRESS,
 >(
-  input: InitializeInput<TAccountAdmin, TAccountConfig, TAccountSystemProgram>,
+  input: InitializeInput<
+    TAccountUser,
+    TAccountChatContext,
+    TAccountOracleProgram,
+    TAccountSystemProgram
+  >,
   config?: { programAddress?: TProgramAddress },
 ): InitializeInstruction<
   TProgramAddress,
-  TAccountAdmin,
-  TAccountConfig,
+  TAccountUser,
+  TAccountChatContext,
+  TAccountOracleProgram,
   TAccountSystemProgram
 > {
   // Program address.
-  const programAddress =
-    config?.programAddress ?? SOLANA_LLM_ORACLE_PROGRAM_ADDRESS;
+  const programAddress = config?.programAddress ?? CHAT_AGENT_PROGRAM_ADDRESS;
 
   // Original accounts.
   const originalAccounts = {
-    admin: { value: input.admin ?? null, isWritable: true },
-    config: { value: input.config ?? null, isWritable: true },
+    user: { value: input.user ?? null, isWritable: true },
+    chatContext: { value: input.chatContext ?? null, isWritable: true },
+    oracleProgram: { value: input.oracleProgram ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -209,7 +155,14 @@ export function getInitializeInstruction<
     ResolvedAccount
   >;
 
+  // Original args.
+  const args = { ...input };
+
   // Resolve default values.
+  if (!accounts.oracleProgram.value) {
+    accounts.oracleProgram.value =
+      "LLM4VF4uxgbcrUdwF9rBh7MUEypURp8FurEdZLhZqed" as Address<"LLM4VF4uxgbcrUdwF9rBh7MUEypURp8FurEdZLhZqed">;
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -218,29 +171,34 @@ export function getInitializeInstruction<
   const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.admin),
-      getAccountMeta(accounts.config),
+      getAccountMeta(accounts.user),
+      getAccountMeta(accounts.chatContext),
+      getAccountMeta(accounts.oracleProgram),
       getAccountMeta(accounts.systemProgram),
     ],
-    data: getInitializeInstructionDataEncoder().encode({}),
+    data: getInitializeInstructionDataEncoder().encode(
+      args as InitializeInstructionDataArgs,
+    ),
     programAddress,
   } as InitializeInstruction<
     TProgramAddress,
-    TAccountAdmin,
-    TAccountConfig,
+    TAccountUser,
+    TAccountChatContext,
+    TAccountOracleProgram,
     TAccountSystemProgram
   >);
 }
 
 export type ParsedInitializeInstruction<
-  TProgram extends string = typeof SOLANA_LLM_ORACLE_PROGRAM_ADDRESS,
+  TProgram extends string = typeof CHAT_AGENT_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    admin: TAccountMetas[0];
-    config: TAccountMetas[1];
-    systemProgram: TAccountMetas[2];
+    user: TAccountMetas[0];
+    chatContext: TAccountMetas[1];
+    oracleProgram: TAccountMetas[2];
+    systemProgram: TAccountMetas[3];
   };
   data: InitializeInstructionData;
 };
@@ -253,7 +211,7 @@ export function parseInitializeInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
+  if (instruction.accounts.length < 4) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -266,8 +224,9 @@ export function parseInitializeInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      admin: getNextAccount(),
-      config: getNextAccount(),
+      user: getNextAccount(),
+      chatContext: getNextAccount(),
+      oracleProgram: getNextAccount(),
       systemProgram: getNextAccount(),
     },
     data: getInitializeInstructionDataDecoder().decode(instruction.data),
