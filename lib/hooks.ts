@@ -34,3 +34,32 @@ export function useLocalStorage<T>(
 
   return [value, setStoredValue];
 }
+
+// Function to process unprocessed chat text from local storage
+export function processUnprocessedChatText(key: string) {
+  try {
+    const storedValue = window.localStorage.getItem(key);
+    if (storedValue) {
+      const parsedValue = JSON.parse(storedValue);
+      // Process the parsed value as needed
+      console.log("Processing unprocessed chat text:", parsedValue);
+      // After processing, you might want to remove it from local storage
+      window.localStorage.removeItem(key);
+    }
+  } catch (error) {
+    console.error("Error processing unprocessed chat text:", error);
+  }
+}
+
+export function useUnprocessedChat() {
+  const [unprocessed, setUnprocessed] = useLocalStorage<string[]>(
+    "unprocessedChat",
+    []
+  );
+
+  const addUnprocessed = (text: string) => {
+    setUnprocessed((prev) => [...prev, text]);
+  };
+
+  return { unprocessed, addUnprocessed, setUnprocessed };
+}
