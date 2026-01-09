@@ -38,7 +38,7 @@ const Chat = ({ handleChat, disabled = false }: IChat) => {
         disabled={prompt === "" || disabled}
         className="uppercase font-stretch-semi-expanded cursor-pointer border-b-2 px-4 py-2 disabled:cursor-not-allowed"
       >
-        start chat
+        send
       </button>
     </section>
   );

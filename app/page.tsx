@@ -129,6 +129,6 @@ export default function Home() {
 //     chatContext: "6AutKZY6HpWuLbw8XfariMDREPZYxmiH1jqs3utudtrD",
 //     responseAddress: "HRyJdLiPkPnwoxhP8GTcpjyGfssV24meghgsK33mGJyA",
 //     title: "yo",
-//     messages: [{ type: "user", text: "yo", timestamp: 1767906419189 }],
+//     messages: [{ type: "user", text: "gm", timestamp: 1767906419189 }],
 //   },
 // ];

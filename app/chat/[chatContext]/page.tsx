@@ -68,8 +68,6 @@ export default function ChatPage() {
             const response = new TextDecoder().decode(responseBytes);
 
             console.log("Response from chat:", response);
-            const fullDataDecoded = new TextDecoder().decode(accountInfo.data);
-            console.log("Full response data:", fullDataDecoded);
 
             if (response) {
               const updatedMessages = [
