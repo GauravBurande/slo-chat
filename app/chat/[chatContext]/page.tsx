@@ -1,6 +1,6 @@
 "use client";
 import { useParams } from "next/navigation";
-import { useWalletStore } from "@lazorkit/wallet";
+import { useWalletStore, PublicKey } from "@lazorkit/wallet";
 import {
   address,
   createNoopSigner,
@@ -15,7 +15,7 @@ import Chat from "../../components/chat";
 import Header from "../../components/header";
 import { usePrompt } from "@/context/prompt-context";
 import { useState, useEffect, useRef } from "react";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
 import { getChat, updateChatMessages } from "@/lib/chatHistory";
 import { useUnprocessedChat } from "@/lib/hooks";
 
@@ -23,9 +23,8 @@ const connection = new Connection("https://api.devnet.solana.com");
 
 export default function ChatPage() {
   const { chatContext: chatContextParam } = useParams();
-  const { wallet } = useWalletStore();
+  const { wallet, signAndSendTransaction } = useWalletStore();
   const { prompt, setPrompt } = usePrompt();
-  const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const chatContext = address(chatContextParam as string);
   const chatData = getChat(chatContext.toString());
@@ -36,94 +35,204 @@ export default function ChatPage() {
   >(chatData?.messages || []);
   const { unprocessed, setUnprocessed } = useUnprocessedChat();
   const processingRef = useRef(false);
+  const [unfetchedResponsePda, setUnfetchedResponsePda] = useState<
+    string | null
+  >(null);
 
   const pollResponse = async (
     responseAddress: Address,
     currentMessages: { type: "user" | "ai"; text: string; timestamp: number }[]
-  ) => {
-    while (true) {
-      try {
-        const accountInfo = await connection.getAccountInfo(
-          new PublicKey(responseAddress.toString())
-        );
+  ): Promise<boolean> => {
+    const maxPollTime = 15000; // 15 seconds max
+    const startTime = Date.now();
+    const pollInterval = 2000; // 2 seconds
 
-        if (accountInfo && accountInfo.data.length > 8) {
-          const dataView = new DataView(
-            accountInfo.data.buffer,
-            accountInfo.data.byteOffset + 8
+    console.log("Polling for response at PDA:", responseAddress.toString());
+
+    try {
+      while (Date.now() - startTime < maxPollTime) {
+        try {
+          const accountInfo = await connection.getAccountInfo(
+            new PublicKey(responseAddress.toString())
           );
-          const len = dataView.getUint32(0, true);
-          const responseBytes = accountInfo.data.slice(12, 12 + len);
-          const response = new TextDecoder().decode(responseBytes);
 
-          console.log("Response from chat:", response);
-          const fullDataDecoded = new TextDecoder().decode(accountInfo.data);
-          console.log("Full response data:", fullDataDecoded);
+          console.log("Fetched account info:", accountInfo);
 
-          if (response) {
-            const updatedMessages = [
-              ...currentMessages,
-              { type: "ai" as const, text: response, timestamp: Date.now() },
-            ];
-            setMessages(updatedMessages);
-            updateChatMessages(chatContext.toString(), updatedMessages);
-            setAiResponse(response);
-            setIsLoading(false);
-            break;
+          if (accountInfo && accountInfo.data.length > 8) {
+            const dataView = new DataView(
+              accountInfo.data.buffer,
+              accountInfo.data.byteOffset + 8
+            );
+            const len = dataView.getUint32(0, true);
+            const responseBytes = accountInfo.data.slice(12, 12 + len);
+            const response = new TextDecoder().decode(responseBytes);
+
+            console.log("Response from chat:", response);
+            const fullDataDecoded = new TextDecoder().decode(accountInfo.data);
+            console.log("Full response data:", fullDataDecoded);
+
+            if (response) {
+              const updatedMessages = [
+                ...currentMessages,
+                { type: "ai" as const, text: response, timestamp: Date.now() },
+              ];
+              setMessages(updatedMessages);
+              updateChatMessages(chatContext.toString(), updatedMessages);
+              setIsLoading(false);
+              return true;
+            }
           }
+        } catch (error) {
+          console.error("Error fetching response:", error);
         }
-      } catch (error) {
-        console.error("Error fetching response:", error);
+
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      console.warn(
+        `Failed to get response within ${maxPollTime / 1000} seconds`
+      );
+
+      // Save unfetched response PDA to localStorage
+      localStorage.setItem("unfetchedResponsePda", responseAddress.toString());
+      setUnfetchedResponsePda(responseAddress.toString());
+
+      setIsLoading(false);
+      alert("Timeout: AI response took too long. Please try again.");
+      return false;
+    } catch (error) {
+      console.error("Poll response error:", error);
+      setIsLoading(false);
+      alert("Error polling response. Please check console for details.");
+      return false;
     }
   };
 
-  const processChatText = async (chatText: string) => {
-    const timestamp = Date.now();
-    const newMessages = [
-      ...messages,
-      { type: "user" as const, text: chatText, timestamp },
-    ];
-    setMessages(newMessages);
-    updateChatMessages(chatContext.toString(), newMessages);
+  const sendAiInferenceTransaction = async (
+    instruction: Awaited<ReturnType<typeof getAiInferenceInstructionAsync>>
+  ): Promise<boolean> => {
+    try {
+      const keys = instruction.accounts.map(
+        (account: { address: string; signer?: boolean; role: number }) => ({
+          pubkey: new PublicKey(account.address),
+          isSigner: account.signer ? true : false,
+          isWritable: account.role === 1,
+        })
+      );
 
-    const walletAddress = address(wallet!.smartWallet as string);
-    const transactionSigner = createNoopSigner(walletAddress);
+      console.log("About to sign and send AI inference transaction");
+      const signature = await signAndSendTransaction({
+        instructions: [
+          {
+            data: Buffer.from(instruction.data),
+            keys: keys,
+            programId: new PublicKey(instruction.programAddress),
+          },
+        ],
+        transactionOptions: {
+          feeToken: "USDC",
+          computeUnitLimit: 500_000,
+        },
+      });
 
-    const [responsePda] = await getProgramDerivedAddress({
-      seeds: [
-        Buffer.from("response"),
-        getAddressEncoder().encode(walletAddress),
-      ],
-      programAddress: CHAT_AGENT_PROGRAM_ADDRESS,
-    });
-
-    const [vaultPda] = await getProgramDerivedAddress({
-      seeds: [Buffer.from("vault"), getAddressEncoder().encode(responsePda)],
-      programAddress: CHAT_AGENT_PROGRAM_ADDRESS,
-    });
-
-    const [inferencePda] = await getProgramDerivedAddress({
-      seeds: [
-        Buffer.from("inference"),
-        getAddressEncoder().encode(chatContext),
-      ],
-      programAddress: llmProgramAddress,
-    });
-
-    const aiInferenceInstruction = await getAiInferenceInstructionAsync({
-      user: transactionSigner,
-      chatContext,
-      inference: inferencePda,
-      text: chatText,
-      seed,
-    });
-
-    console.log("AI Inference Instruction:", aiInferenceInstruction);
-    pollResponse(responsePda, newMessages);
+      console.log("AI Inference Transaction sent successfully:", signature);
+      return true;
+    } catch (error) {
+      console.error("Error sending AI inference transaction:", error);
+      setIsLoading(false);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      alert(`Failed to send transaction: ${errorMessage}`);
+      return false;
+    }
   };
+
+  const processChatText = async (chatText: string): Promise<boolean> => {
+    try {
+      const timestamp = Date.now();
+      const newMessages = [
+        ...messages,
+        { type: "user" as const, text: chatText, timestamp },
+      ];
+      setMessages(newMessages);
+      updateChatMessages(chatContext.toString(), newMessages);
+
+      const walletAddress = address(wallet!.smartWallet as string);
+      const transactionSigner = createNoopSigner(walletAddress);
+
+      const [responsePda] = await getProgramDerivedAddress({
+        seeds: [
+          Buffer.from("response"),
+          getAddressEncoder().encode(walletAddress),
+        ],
+        programAddress: CHAT_AGENT_PROGRAM_ADDRESS,
+      });
+
+      const [inferencePda] = await getProgramDerivedAddress({
+        seeds: [
+          Buffer.from("inference"),
+          getAddressEncoder().encode(walletAddress),
+          getAddressEncoder().encode(chatContext),
+        ],
+        programAddress: llmProgramAddress,
+      });
+
+      const aiInferenceInstruction = await getAiInferenceInstructionAsync({
+        user: transactionSigner,
+        chatContext,
+        inference: inferencePda,
+        text: chatText,
+        seed,
+      });
+
+      console.log("AI Inference Instruction:", aiInferenceInstruction);
+
+      // Send transaction and only poll if successful
+      const txnSent = await sendAiInferenceTransaction(aiInferenceInstruction);
+      if (txnSent) {
+        pollResponse(responsePda, newMessages);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error processing chat text:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      alert(`Failed to process message: ${errorMessage}`);
+      setIsLoading(false);
+      return false;
+    }
+  };
+
+  // Fetch unfetched responses on page load
+  useEffect(() => {
+    const fetchUnfetchedResponse = async () => {
+      const pdaAddress = localStorage.getItem("unfetchedResponsePda");
+
+      if (!pdaAddress) {
+        setUnfetchedResponsePda(null);
+        return;
+      }
+
+      setUnfetchedResponsePda(pdaAddress);
+
+      try {
+        console.log("Fetching unfetched response from:", pdaAddress);
+        const responseAddress = address(pdaAddress);
+        const success = await pollResponse(responseAddress, messages);
+        // Only remove from localStorage if successfully fetched
+        if (success) {
+          localStorage.removeItem("unfetchedResponsePda");
+          setUnfetchedResponsePda(null);
+        }
+      } catch (error) {
+        console.error("Error fetching unfetched response:", error);
+      }
+    };
+
+    fetchUnfetchedResponse();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatContext]);
 
   // Process unprocessed chats - fixed version
   useEffect(() => {
@@ -132,69 +241,87 @@ export default function ChatPage() {
 
       const processAll = async () => {
         const toProcess = [...unprocessed];
+        const successfulChats: string[] = [];
 
         for (const chatText of toProcess) {
-          await processChatText(chatText);
+          const success = await processChatText(chatText);
+          if (success) {
+            successfulChats.push(chatText);
+          }
         }
 
-        // Clear all processed messages at once
-        setUnprocessed([]);
+        // Only clear successfully processed messages
+        if (successfulChats.length > 0) {
+          setUnprocessed(
+            unprocessed.filter((msg) => !successfulChats.includes(msg))
+          );
+        }
         processingRef.current = false;
       };
 
       processAll();
     }
-  }, [unprocessed.length > 0, wallet?.smartWallet]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unprocessed.length, wallet]);
 
   const handleChat = async () => {
-    if (!wallet || !prompt) return;
+    try {
+      if (!wallet || !prompt) return;
 
-    setIsLoading(true);
-    setAiResponse(null);
+      setIsLoading(true);
 
-    const timestamp = Date.now();
-    const newMessages = [
-      ...messages,
-      { type: "user" as const, text: prompt, timestamp },
-    ];
-    setMessages(newMessages);
-    updateChatMessages(chatContext.toString(), newMessages);
+      const timestamp = Date.now();
+      const newMessages = [
+        ...messages,
+        { type: "user" as const, text: prompt, timestamp },
+      ];
+      setMessages(newMessages);
+      updateChatMessages(chatContext.toString(), newMessages);
 
-    const walletAddress = address(wallet.smartWallet as string);
-    const transactionSigner = createNoopSigner(walletAddress);
+      const walletAddress = address(wallet.smartWallet as string);
+      const transactionSigner = createNoopSigner(walletAddress);
 
-    const [responsePda] = await getProgramDerivedAddress({
-      seeds: [
-        Buffer.from("response"),
-        getAddressEncoder().encode(walletAddress),
-      ],
-      programAddress: CHAT_AGENT_PROGRAM_ADDRESS,
-    });
+      const [responsePda] = await getProgramDerivedAddress({
+        seeds: [
+          Buffer.from("response"),
+          getAddressEncoder().encode(walletAddress),
+        ],
+        programAddress: CHAT_AGENT_PROGRAM_ADDRESS,
+      });
 
-    const [vaultPda] = await getProgramDerivedAddress({
-      seeds: [Buffer.from("vault"), getAddressEncoder().encode(responsePda)],
-      programAddress: CHAT_AGENT_PROGRAM_ADDRESS,
-    });
+      const [inferencePda] = await getProgramDerivedAddress({
+        seeds: [
+          Buffer.from("inference"),
+          getAddressEncoder().encode(walletAddress),
+          getAddressEncoder().encode(chatContext),
+        ],
+        programAddress: llmProgramAddress,
+      });
 
-    const [inferencePda] = await getProgramDerivedAddress({
-      seeds: [
-        Buffer.from("inference"),
-        getAddressEncoder().encode(chatContext),
-      ],
-      programAddress: llmProgramAddress,
-    });
+      const aiInferenceInstruction = await getAiInferenceInstructionAsync({
+        user: transactionSigner,
+        chatContext,
+        inference: inferencePda,
+        text: prompt,
+        seed,
+      });
 
-    const aiInferenceInstruction = await getAiInferenceInstructionAsync({
-      user: transactionSigner,
-      chatContext,
-      inference: inferencePda,
-      text: prompt,
-      seed,
-    });
+      console.log("AI Inference Instruction:", aiInferenceInstruction);
 
-    console.log("AI Inference Instruction:", aiInferenceInstruction);
-    pollResponse(responsePda, newMessages);
-    setPrompt("");
+      // Send transaction and only poll if successful
+      const txnSent = await sendAiInferenceTransaction(aiInferenceInstruction);
+      if (txnSent) {
+        pollResponse(responsePda, newMessages);
+      }
+
+      setPrompt("");
+    } catch (error) {
+      console.error("Error in handleChat:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      alert(`Failed to send message: ${errorMessage}`);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -207,7 +334,11 @@ export default function ChatPage() {
           </div>
         ))}
         {isLoading && <div>Loading AI response...</div>}
-        <Chat handleChat={handleChat} />
+        {unfetchedResponsePda && <div>Fetching previous response...</div>}
+        <Chat
+          handleChat={handleChat}
+          disabled={isLoading || !!unfetchedResponsePda}
+        />
       </div>
     </main>
   );

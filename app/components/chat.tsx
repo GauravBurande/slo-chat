@@ -4,13 +4,14 @@ import { usePrompt } from "@/context/prompt-context";
 
 interface IChat {
   handleChat: () => void;
+  disabled?: boolean;
 }
 
-const Chat = ({ handleChat }: IChat) => {
+const Chat = ({ handleChat, disabled = false }: IChat) => {
   const { prompt, setPrompt } = usePrompt();
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !disabled) {
       e.preventDefault();
       handleChat();
     }
@@ -30,10 +31,11 @@ const Chat = ({ handleChat }: IChat) => {
         onChange={(e) => setPrompt(e.target.value)}
         onKeyDown={handleKeyDown}
         rows={getRows()}
+        disabled={disabled}
       />
       <button
         onClick={handleChat}
-        disabled={prompt === ""}
+        disabled={prompt === "" || disabled}
         className="uppercase font-stretch-semi-expanded cursor-pointer border-b-2 px-4 py-2 disabled:cursor-not-allowed"
       >
         start chat

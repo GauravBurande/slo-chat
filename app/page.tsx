@@ -9,7 +9,6 @@ import {
   createNoopSigner,
   getProgramDerivedAddress,
   getAddressEncoder,
-  AccountMeta,
 } from "@solana/kit";
 import { getChatContext } from "@/lib/llm-accounts";
 import { useRouter } from "next/navigation";
@@ -35,10 +34,15 @@ export default function Home() {
 
   const handleChatStart = async () => {
     try {
+      console.log("seed value:", seed);
       if (wallet && prompt) {
+        console.log("wallet and prompt exist");
         const walletAddress = address(wallet?.smartWallet as string);
         const transactionSigner = createNoopSigner(walletAddress);
+        console.log("walletAddress:", walletAddress);
+
         const chatContext = await getChatContext(wallet.smartWallet, seed);
+        console.log("chatContext:", chatContext);
 
         const createChatInstruction = getInitializeInstruction({
           seed,
@@ -48,17 +52,20 @@ export default function Home() {
 
         console.log(createChatInstruction);
 
-        const keys = createChatInstruction.accounts.map((account: any) => ({
-          pubkey: new PublicKey(account.address),
-          isSigner: account.signer ? true : false,
-          isWritable: account.role === 1,
-        }));
+        const keys = createChatInstruction.accounts.map(
+          (account: { address: string; signer?: boolean; role: number }) => ({
+            pubkey: new PublicKey(account.address),
+            isSigner: account.signer ? true : false,
+            isWritable: account.role === 1,
+          })
+        );
 
         console.log(
           "Instruction account role:",
           createChatInstruction.accounts[0].role
         );
 
+        console.log("About to sign and send transaction");
         const signature = await signAndSendTransaction({
           instructions: [
             {
@@ -83,6 +90,8 @@ export default function Home() {
           programAddress: CHAT_AGENT_PROGRAM_ADDRESS,
         });
 
+        console.log("responseAddress:", responseAddress);
+
         saveChat({
           seed,
           chatContext: chatContext.toString(),
@@ -91,9 +100,12 @@ export default function Home() {
           messages: [],
         });
 
+        console.log("Chat saved");
         addUnprocessed(prompt);
-
+        console.log("About to navigate");
         router.push(`/chat/${chatContext}`);
+      } else {
+        alert("wallet or prompt missing");
       }
     } catch (error) {
       console.error("Failed to start chat:", error);
@@ -109,3 +121,14 @@ export default function Home() {
     </main>
   );
 }
+
+// seed 0 ixn
+// [
+//   {
+//     seed: 0,
+//     chatContext: "6AutKZY6HpWuLbw8XfariMDREPZYxmiH1jqs3utudtrD",
+//     responseAddress: "HRyJdLiPkPnwoxhP8GTcpjyGfssV24meghgsK33mGJyA",
+//     title: "yo",
+//     messages: [{ type: "user", text: "yo", timestamp: 1767906419189 }],
+//   },
+// ];
