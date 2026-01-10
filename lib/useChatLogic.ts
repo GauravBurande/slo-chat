@@ -18,6 +18,7 @@ import {
   sendAiInferenceTransaction,
   Message,
 } from "@/lib/chatUtils";
+import { sleep } from "./basicUtils";
 
 export const useChatLogic = () => {
   const { chatContext: chatContextParam } = useParams();
@@ -224,6 +225,9 @@ export const useChatLogic = () => {
         setIsLoading
       );
       if (txnSent) {
+        // sleep for 0.5 sec
+        await sleep(500);
+
         pollResponse(
           responsePda,
           newMessages,
