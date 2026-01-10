@@ -5,3 +5,6 @@ pub mod callback;
 pub use initialize::*;
 pub use ai_inference::*;
 pub use callback::*;
+
+
+// todo: close vault

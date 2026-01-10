@@ -35,7 +35,12 @@ const Header = () => {
     <>
       <header className="flex py-5 font-stretch-semi-expanded font-mono justify-between items-center border-b-2">
         <Link href="/">
-          <h1>slochat</h1>
+          <div className="flex items-center gap-2">
+            <h1>slochat</h1>
+            <span className="text-xs px-2 py-0.5 rounded-full border border-pink-600 text-pink-600">
+              devnet
+            </span>
+          </div>
         </Link>
         <div className="flex items-center gap-4">
           <button
