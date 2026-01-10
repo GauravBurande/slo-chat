@@ -33,51 +33,51 @@ const Header = () => {
 
   return (
     <>
-      <header className="flex py-5 font-stretch-semi-expanded justify-between items-center border-b-2">
+      <header className="flex py-5 font-stretch-semi-expanded font-mono justify-between items-center border-b-2">
+        <Link href="/">
+          <h1>slochat</h1>
+        </Link>
         <div className="flex items-center gap-4">
-          <Link href="/">
-            <h1 className="uppercase">slo chat</h1>
-          </Link>
           <button
             onClick={() => setShowHistory(true)}
-            className="cursor-pointer hover:text-pink-600"
+            className="cursor-pointer opacity-80 hover:text-pink-600"
           >
-            <History className="w-5 h-5" />
+            <History className="w-4.5 h-4.5" />
           </button>
-        </div>
-        <div className="cursor-pointer">
-          {isConnected && wallet ? (
-            <div className="flex items-center gap-2">
+          <div className="cursor-pointer">
+            {isConnected && wallet ? (
+              <div className="flex items-center gap-2">
+                <button
+                  className="cursor-pointer hover:text-pink-600"
+                  onClick={() => disconnect()}
+                >
+                  Disconnect ({wallet.smartWallet.slice(0, 6)}...)
+                </button>
+                <button className="cursor-pointer">
+                  {copied ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Copy
+                      onClick={handleCopy}
+                      className="w-4 h-4 hover:text-pink-600"
+                    />
+                  )}
+                </button>
+              </div>
+            ) : (
               <button
-                className="cursor-pointer hover:text-pink-600"
-                onClick={() => disconnect()}
+                className="cursor-pointer"
+                onClick={() => connect()}
+                disabled={isConnecting}
               >
-                Disconnect ({wallet.smartWallet.slice(0, 6)}...)
+                {isConnecting ? "Connecting..." : "Connect Wallet"}
               </button>
-              <button className="cursor-pointer">
-                {copied ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <Copy
-                    onClick={handleCopy}
-                    className="w-4 h-4 hover:text-pink-600"
-                  />
-                )}
-              </button>
-            </div>
-          ) : (
-            <button
-              className="cursor-pointer"
-              onClick={() => connect()}
-              disabled={isConnecting}
-            >
-              {isConnecting ? "Connecting..." : "Connect Wallet"}
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </header>
       {showHistory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-slate-800 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg max-w-md w-full max-h-96 overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">Chat History</h2>
             {chats.length === 0 ? (

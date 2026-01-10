@@ -18,6 +18,7 @@ import { useState, useEffect, useRef } from "react";
 import { Connection } from "@solana/web3.js";
 import { getChat, updateChatMessages } from "@/lib/chatHistory";
 import { useUnprocessedChat } from "@/lib/hooks";
+import { Check, Copy } from "lucide-react";
 
 const connection = new Connection("https://api.devnet.solana.com");
 
@@ -26,6 +27,8 @@ export default function ChatPage() {
   const { wallet, signAndSendTransaction } = useWalletStore();
   const { prompt, setPrompt } = usePrompt();
   const [isLoading, setIsLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const chatContext = address(chatContextParam as string);
   const chatData = getChat(chatContext.toString());
   const seed = chatData?.seed || 0;
@@ -142,6 +145,16 @@ export default function ChatPage() {
         error instanceof Error ? error.message : "Unknown error";
       alert(`Failed to send transaction: ${errorMessage}`);
       return false;
+    }
+  };
+
+  const handleCopy = async (textToCopy: string) => {
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1000);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -341,8 +354,21 @@ export default function ChatPage() {
                     : "bg-gray-200 text-gray-900 rounded-bl-none"
                 }`}
               >
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  {msg.type === "user" ? "👤" : "🤖"} {msg.text}
+                <div className="prose prose-sm dark:prose-invert max-w-none flex items-start gap-2">
+                  <span>{msg.type === "user" ? "👤" : "🤖"}</span>
+                  <span className="flex-1">{msg.text}</span>
+                  <button className="cursor-pointer">
+                    {copied ? (
+                      <Check className="h-3 w-3" />
+                    ) : (
+                      <Copy
+                        onClick={() => {
+                          handleCopy(msg.text);
+                        }}
+                        className="w-3 h-3 hover:text-pink-600"
+                      />
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
