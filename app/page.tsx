@@ -50,8 +50,6 @@ export default function Home() {
           chatContext,
         });
 
-        console.log(createChatInstruction);
-
         const keys = createChatInstruction.accounts.map(
           (account: { address: string; signer?: boolean; role: number }) => ({
             pubkey: new PublicKey(account.address),
@@ -60,12 +58,6 @@ export default function Home() {
           })
         );
 
-        console.log(
-          "Instruction account role:",
-          createChatInstruction.accounts[0].role
-        );
-
-        console.log("About to sign and send transaction");
         const signature = await signAndSendTransaction({
           instructions: [
             {
@@ -75,7 +67,6 @@ export default function Home() {
             },
           ],
           transactionOptions: {
-            feeToken: "USDC",
             computeUnitLimit: 500_000,
           },
         });

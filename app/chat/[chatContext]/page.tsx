@@ -326,11 +326,28 @@ export default function ChatPage() {
     <main className="px-10">
       <Header />
       <div className="flex bg-[url('/bg2.png')] bg-cover bg-no-repeat min-h-[90vh] w-full flex-col items-center justify-center">
-        {messages.map((msg, index) => (
-          <div key={index}>
-            <strong>{msg.type === "user" ? "You:" : "AI:"}</strong> {msg.text}
-          </div>
-        ))}
+        <div className="w-full max-h-[60vh] overflow-y-scroll max-w-4xl space-y-4 mb-8 px-4">
+          {messages.map((msg, index) => (
+            <div
+              key={index}
+              className={`flex gap-3 ${
+                msg.type === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
+              <div
+                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                  msg.type === "user"
+                    ? "bg-blue-500 text-white rounded-br-none"
+                    : "bg-gray-200 text-gray-900 rounded-bl-none"
+                }`}
+              >
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  {msg.type === "user" ? "👤" : "🤖"} {msg.text}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
         {isLoading && <div>Loading AI response...</div>}
         {unfetchedResponsePda && <div>Fetching previous response...</div>}
         <Chat
