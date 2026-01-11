@@ -28,7 +28,10 @@ export const pollResponse = async (
     while (Date.now() - startTime < maxPollTime) {
       try {
         const accountInfo = await connection.getAccountInfo(
-          new PublicKey(responseAddress.toString())
+          new PublicKey(responseAddress.toString()),
+          {
+            commitment: "finalized",
+          }
         );
 
         if (accountInfo && accountInfo.data.length > 8) {
@@ -85,7 +88,9 @@ export const pollResponse = async (
     localStorage.setItem("unfetchedResponsePda", responseAddress.toString());
     setUnfetchedResponsePda(responseAddress.toString());
     setIsLoading(false);
-    alert("Timeout: AI response took too long. Please try again.");
+    alert(
+      "Timeout: AI response took too long. Refresh the page! Please try again."
+    );
     return false;
   } catch (err) {
     console.error("Poll response error:", err);
