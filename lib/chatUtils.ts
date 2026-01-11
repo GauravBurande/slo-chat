@@ -9,6 +9,8 @@ export interface Message {
   timestamp: number;
 }
 
+const LAST_AI_RESPONSE_KEY = "lastAiResponse";
+
 export const pollResponse = async (
   responseAddress: Address,
   currentMessages: Message[],
@@ -18,20 +20,21 @@ export const pollResponse = async (
   setIsLoading: (loading: boolean) => void,
   setUnfetchedResponsePda: (pda: string | null) => void
 ): Promise<boolean> => {
-  const maxPollTime = 15_000; // 15 seconds
-  const pollInterval = 2_000; // 2 seconds
+  const maxPollTime = 15_000;
+  const pollInterval = 2_000;
   const startTime = Date.now();
 
   console.log("Polling for response at PDA:", responseAddress.toString());
+
+  // 👇 read last AI message from localStorage
+  const lastStoredAiResponse = localStorage.getItem(LAST_AI_RESPONSE_KEY);
 
   try {
     while (Date.now() - startTime < maxPollTime) {
       try {
         const accountInfo = await connection.getAccountInfo(
           new PublicKey(responseAddress.toString()),
-          {
-            commitment: "finalized",
-          }
+          { commitment: "finalized" }
         );
 
         if (accountInfo && accountInfo.data.length > 8) {
@@ -49,19 +52,14 @@ export const pollResponse = async (
             continue;
           }
 
-          // 🔑 Get most recent AI message (if any)
-          const lastAiMessage = [...currentMessages]
-            .reverse()
-            .find((m) => m.type === "ai");
-
-          // 🚫 Duplicate response → keep polling
-          if (lastAiMessage?.text === response) {
+          // 🚫 duplicate check via localStorage instead of chat history
+          if (lastStoredAiResponse === response) {
             console.log("Duplicate AI response detected, continuing polling");
             await new Promise((r) => setTimeout(r, pollInterval));
             continue;
           }
 
-          // ✅ New response → push
+          // ✅ new response
           const updatedMessages = [
             ...currentMessages,
             {
@@ -73,6 +71,10 @@ export const pollResponse = async (
 
           setMessages(updatedMessages);
           updateChatMessages(chatContext, updatedMessages);
+
+          // 🔑 persist last AI response
+          localStorage.setItem(LAST_AI_RESPONSE_KEY, response);
+
           setIsLoading(false);
           return true;
         }
@@ -84,10 +86,10 @@ export const pollResponse = async (
     }
 
     console.warn(`Failed to get response within ${maxPollTime / 1000}s`);
-
     localStorage.setItem("unfetchedResponsePda", responseAddress.toString());
     setUnfetchedResponsePda(responseAddress.toString());
     setIsLoading(false);
+
     alert(
       "Timeout: AI response took too long. Refresh the page! Please try again."
     );
