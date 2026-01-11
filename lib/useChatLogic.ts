@@ -117,6 +117,7 @@ export const useChatLogic = () => {
       }
 
       setUnfetchedResponsePda(pdaAddress);
+      setIsLoading(true);
 
       try {
         console.log("Fetching unfetched response from:", pdaAddress);
@@ -137,6 +138,8 @@ export const useChatLogic = () => {
         }
       } catch (error) {
         console.error("Error fetching unfetched response:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -150,6 +153,7 @@ export const useChatLogic = () => {
       processingRef.current = true;
 
       const processAll = async () => {
+        setIsLoading(true);
         const toProcess = [...unprocessed];
         const successfulChats: string[] = [];
 
@@ -167,6 +171,7 @@ export const useChatLogic = () => {
           );
         }
         processingRef.current = false;
+        setIsLoading(false);
       };
 
       processAll();
