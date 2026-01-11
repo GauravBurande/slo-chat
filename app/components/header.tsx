@@ -7,6 +7,14 @@ import Link from "next/link";
 import { useState } from "react";
 import { getChats } from "@/lib/chatHistory";
 import { useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const Header = () => {
   const [copied, setCopied] = useState(false);
@@ -82,36 +90,41 @@ const Header = () => {
         </div>
       </header>
       {showHistory && (
-        <div className="fixed inset-0 bg-slate-800 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full max-h-96 overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">Chat History</h2>
+        <Dialog open={showHistory} onOpenChange={setShowHistory}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Chat History</DialogTitle>
+            </DialogHeader>
+
             {chats.length === 0 ? (
-              <p>No chats yet.</p>
+              <p className="text-sm text-muted-foreground">No chats yet.</p>
             ) : (
-              <ul>
-                {chats.map((chat) => (
-                  <li key={chat.chatContext}>
-                    <button
+              <ScrollArea className="h-72 pr-2">
+                <div className="space-y-1">
+                  {chats.map((chat) => (
+                    <Button
+                      key={chat.chatContext}
+                      variant="ghost"
+                      className="w-full justify-start text-left"
                       onClick={() => {
                         setShowHistory(false);
                         router.push(`/chat/${chat.chatContext}`);
                       }}
-                      className="w-full text-left p-2 hover:bg-gray-100 rounded"
                     >
                       {chat.title}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
             )}
-            <button
-              onClick={() => setShowHistory(false)}
-              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+
+            <div className="flex justify-end pt-2">
+              <Button variant="secondary" onClick={() => setShowHistory(false)}>
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
