@@ -23,3 +23,5 @@ export default function ChatPage() {
     </main>
   );
 }
+
+// todo/ fix laoding ai response loading

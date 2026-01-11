@@ -180,14 +180,6 @@ export const useChatLogic = () => {
 
       setIsLoading(true);
 
-      const timestamp = Date.now();
-      const newMessages = [
-        ...messages,
-        { type: "user" as const, text: prompt, timestamp },
-      ];
-      setMessages(newMessages);
-      updateChatMessages(chatContext.toString(), newMessages);
-
       const walletAddress = address(wallet.smartWallet as string);
       const transactionSigner = createNoopSigner(walletAddress);
 
@@ -224,9 +216,20 @@ export const useChatLogic = () => {
         signAndSendTransaction,
         setIsLoading
       );
+
+      console.log("Transaction sent:", txnSent);
+
       if (txnSent) {
         // sleep for 0.5 sec
         await sleep(500);
+
+        const timestamp = Date.now();
+        const newMessages = [
+          ...messages,
+          { type: "user" as const, text: prompt, timestamp },
+        ];
+        setMessages(newMessages);
+        updateChatMessages(chatContext.toString(), newMessages);
 
         pollResponse(
           responsePda,
@@ -237,9 +240,9 @@ export const useChatLogic = () => {
           setIsLoading,
           setUnfetchedResponsePda
         );
-      }
 
-      setPrompt("");
+        setPrompt("");
+      }
     } catch (error) {
       console.error("Error in handleChat:", error);
       const errorMessage =

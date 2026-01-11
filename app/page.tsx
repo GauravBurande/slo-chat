@@ -16,24 +16,22 @@ import { usePrompt } from "@/context/prompt-context";
 import { saveChat } from "@/lib/chatHistory";
 import { CHAT_AGENT_PROGRAM_ADDRESS } from "@/program-helpers/programs";
 import { useUnprocessedChat } from "@/lib/hooks";
-import { useState, useEffect } from "react";
 
 export default function Home() {
   const { wallet, signAndSendTransaction } = useWalletStore();
   const router = useRouter();
   const { prompt } = usePrompt();
   const { addUnprocessed } = useUnprocessedChat();
-  const [seed, setSeed] = useState(0);
-
-  useEffect(() => {
-    const raw = localStorage.getItem("seed");
-    const next = raw === null ? 0 : Number(raw) + 1;
-    localStorage.setItem("seed", String(next));
-    setTimeout(() => setSeed(next), 0);
-  }, []);
 
   const handleChatStart = async () => {
     try {
+      let seed: number;
+      const raw = localStorage.getItem("seed");
+      if (raw === null) {
+        seed = 0;
+      } else {
+        seed = Number(raw) + 1;
+      }
       console.log("seed value:", seed);
       if (wallet && prompt) {
         console.log("wallet and prompt exist");
@@ -90,6 +88,8 @@ export default function Home() {
           title: prompt,
           messages: [],
         });
+
+        localStorage.setItem("seed", String(seed));
 
         console.log("Chat saved");
         addUnprocessed(prompt);

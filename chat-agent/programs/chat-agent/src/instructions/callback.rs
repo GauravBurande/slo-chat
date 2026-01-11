@@ -57,14 +57,18 @@ impl CallbackFromAi<'_> {
 
             transfer(cpi_context, additional_rent)?;
         }
-
-        response_info.resize(required_space)?;
         
-        let mut res_data = self.response.try_borrow_mut_data()?;
-        let mut res_account = Response::try_deserialize_unchecked(&mut res_data.as_ref()).unwrap();
+        let mut res_account = {
+            let data = self.response.try_borrow_data()?;
+            Response::try_deserialize_unchecked(&mut data.as_ref())?
+        };
+
         res_account.response = ai_response;
 
-         res_account.try_serialize(&mut res_data.as_mut())?;
+        response_info.resize(required_space)?;
+
+        let mut res_data = self.response.try_borrow_mut_data()?;
+        res_account.try_serialize(&mut res_data.as_mut())?;
         Ok(())
     }
 }
