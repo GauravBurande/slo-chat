@@ -18,9 +18,9 @@ export const pollResponse = async (
   setIsLoading: (loading: boolean) => void,
   setUnfetchedResponsePda: (pda: string | null) => void
 ): Promise<boolean> => {
-  const maxPollTime = 15000; // 15 seconds max
+  const maxPollTime = 15_000; // 15 seconds
+  const pollInterval = 2_000; // 2 seconds
   const startTime = Date.now();
-  const pollInterval = 2000; // 2 seconds
 
   console.log("Polling for response at PDA:", responseAddress.toString());
 
@@ -31,47 +31,64 @@ export const pollResponse = async (
           new PublicKey(responseAddress.toString())
         );
 
-        console.log("Fetched account info:", accountInfo);
-
         if (accountInfo && accountInfo.data.length > 8) {
           const dataView = new DataView(
             accountInfo.data.buffer,
             accountInfo.data.byteOffset + 8
           );
+
           const len = dataView.getUint32(0, true);
           const responseBytes = accountInfo.data.slice(12, 12 + len);
-          const response = new TextDecoder().decode(responseBytes);
+          const response = new TextDecoder().decode(responseBytes).trim();
 
-          console.log("Response from chat:", response);
-
-          if (response) {
-            const updatedMessages = [
-              ...currentMessages,
-              { type: "ai" as const, text: response, timestamp: Date.now() },
-            ];
-            setMessages(updatedMessages);
-            updateChatMessages(chatContext, updatedMessages);
-            setIsLoading(false);
-            return true;
+          if (!response) {
+            await new Promise((r) => setTimeout(r, pollInterval));
+            continue;
           }
+
+          // 🔑 Get most recent AI message (if any)
+          const lastAiMessage = [...currentMessages]
+            .reverse()
+            .find((m) => m.type === "ai");
+
+          // 🚫 Duplicate response → keep polling
+          if (lastAiMessage?.text === response) {
+            console.log("Duplicate AI response detected, continuing polling");
+            await new Promise((r) => setTimeout(r, pollInterval));
+            continue;
+          }
+
+          // ✅ New response → push
+          const updatedMessages = [
+            ...currentMessages,
+            {
+              type: "ai" as const,
+              text: response,
+              timestamp: Date.now(),
+            },
+          ];
+
+          setMessages(updatedMessages);
+          updateChatMessages(chatContext, updatedMessages);
+          setIsLoading(false);
+          return true;
         }
-      } catch (error) {
-        console.error("Error fetching response:", error);
+      } catch (err) {
+        console.error("Error fetching response:", err);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      await new Promise((r) => setTimeout(r, pollInterval));
     }
 
-    console.warn(`Failed to get response within ${maxPollTime / 1000} seconds`);
+    console.warn(`Failed to get response within ${maxPollTime / 1000}s`);
 
-    // Save unfetched response PDA to localStorage
     localStorage.setItem("unfetchedResponsePda", responseAddress.toString());
     setUnfetchedResponsePda(responseAddress.toString());
     setIsLoading(false);
     alert("Timeout: AI response took too long. Please try again.");
     return false;
-  } catch (error) {
-    console.error("Poll response error:", error);
+  } catch (err) {
+    console.error("Poll response error:", err);
     setIsLoading(false);
     alert("Error polling response. Please check console for details.");
     return false;
@@ -125,7 +142,6 @@ export const sendAiInferenceTransaction = async (
       },
     });
 
-    console.log("AI Inference Transaction sent successfully:", signature);
     return true;
   } catch (error) {
     console.error("Error sending AI inference transaction:", error);

@@ -217,11 +217,11 @@ export const useChatLogic = () => {
         setIsLoading
       );
 
-      console.log("Transaction sent:", txnSent);
-
       if (txnSent) {
-        // sleep for 0.5 sec
-        await sleep(500);
+        // sleep for 10 sec
+        console.log("Transaction sent, waiting before polling...");
+        await sleep(10000);
+        console.log("Starting to poll for response...");
 
         const timestamp = Date.now();
         const newMessages = [
